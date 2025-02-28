@@ -1,0 +1,12 @@
+{
+	"name": "ls_adls_stockdata",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"description": "Connection to Stock ETL Data Lake",
+		"annotations": [],
+		"type": "AzureBlobFS",
+		"typeProperties": {
+			"url": "https://stocketlstore1.dfs.core.windows.net/"
+		}
+	}
+}

@@ -1,0 +1,34 @@
+{
+	"name": "ds_yeahoo_finance_hist",
+	"properties": {
+		"description": "Dataset for fetching data from Yahoo Finance API",
+		"linkedServiceName": {
+			"referenceName": "ls_yahoo_finance",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"symbol": {
+				"type": "string"
+			},
+			"interval": {
+				"type": "string"
+			},
+			"startDate": {
+				"type": "string"
+			},
+			"endDate": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "RestResource",
+		"typeProperties": {
+			"relativeUrl": {
+				"value": "@concat(\n    dataset().symbol,\n    '?period1=',\n    dataset().startDate,\n    '&period2=',\n    dataset().endDate,\n    '&interval=',\n    dataset().interval\n)",
+				"type": "Expression"
+			}
+		},
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

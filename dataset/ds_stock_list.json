@@ -1,0 +1,36 @@
+{
+	"name": "ds_stock_list",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_adls_stockdata",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "Json",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": "stockList.json",
+				"folderPath": "lookup",
+				"fileSystem": "stock-etl-project"
+			}
+		},
+		"schema": {
+			"type": "object",
+			"properties": {
+				"stocks": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"properties": {
+							"symbol": {
+								"type": "string"
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

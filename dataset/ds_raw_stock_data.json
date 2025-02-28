@@ -1,0 +1,37 @@
+{
+	"name": "ds_raw_stock_data",
+	"properties": {
+		"description": "Raw stock data in JSON format",
+		"linkedServiceName": {
+			"referenceName": "ls_adls_stockdata",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"symbol": {
+				"type": "string"
+			},
+			"dataType": {
+				"type": "string",
+				"defaultValue": "daily"
+			}
+		},
+		"annotations": [],
+		"type": "Json",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": {
+					"value": "@concat(dataset().symbol, if(equals(dataset().dataType, 'historical'), '_historical.json', concat('_', formatDateTime(utcnow(), 'yyyy-MM-dd'), '.json')))",
+					"type": "Expression"
+				},
+				"folderPath": {
+					"value": "@concat('raw/stock-data/', dataset().dataType, if(equals(dataset().dataType, 'daily'), concat('/', formatDateTime(utcnow(), 'yyyy'), '/', formatDateTime(utcnow(), 'MM')), ''))",
+					"type": "Expression"
+				},
+				"fileSystem": "stock-etl-project"
+			}
+		},
+		"schema": {}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

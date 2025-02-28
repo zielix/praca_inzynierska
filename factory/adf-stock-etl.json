@@ -1,0 +1,9 @@
+{
+	"name": "adf-stock-etl",
+	"location": "westeurope",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "ba27e8fe-1e41-4706-8181-7ac1353c6d4d",
+		"tenantId": "262dbaf1-38a1-43f9-a7da-3022da85cc5e"
+	}
+}

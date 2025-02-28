@@ -1,0 +1,20 @@
+{
+	"name": "ds_processed_stock_data",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_adls_stockdata",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "Json",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": "stock_data.parquet",
+				"folderPath": "processed"
+			}
+		},
+		"schema": {}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

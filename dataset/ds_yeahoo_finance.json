@@ -1,0 +1,28 @@
+{
+	"name": "ds_yeahoo_finance",
+	"properties": {
+		"description": "Dataset for fetching data from Yahoo Finance API",
+		"linkedServiceName": {
+			"referenceName": "ls_yahoo_finance",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"symbol": {
+				"type": "string"
+			},
+			"interval": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "RestResource",
+		"typeProperties": {
+			"relativeUrl": {
+				"value": "@concat(\n    dataset().symbol,\n    '?period1=',\n    string(div(sub(ticks(addDays(utcNow(), -1)), ticks('1970-01-01T00:00:00Z')), 10000000)),\n    '&period2=',\n    string(div(sub(ticks(utcNow()), ticks('1970-01-01T00:00:00Z')), 10000000)),\n    '&interval=',\n    dataset().interval\n)",
+				"type": "Expression"
+			}
+		},
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

@@ -1,0 +1,182 @@
+{
+	"name": "pl_load_historical_data",
+	"properties": {
+		"description": "Master pipeline for orchestrating stock data ETL process",
+		"activities": [
+			{
+				"name": "ForEach Stock Symbol",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get Stock List",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Stock list').output.value[0].stocks",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Save raw data",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 3,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "RestSource",
+									"httpRequestTimeout": "00:01:40",
+									"requestInterval": "00.00:00:00.010",
+									"requestMethod": "GET",
+									"paginationRules": {
+										"supportRFC5988": "true"
+									}
+								},
+								"sink": {
+									"type": "JsonSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "JsonWriteSettings"
+									}
+								},
+								"enableStaging": false
+							},
+							"inputs": [
+								{
+									"referenceName": "ds_yeahoo_finance_hist",
+									"type": "DatasetReference",
+									"parameters": {
+										"symbol": {
+											"value": "@item().symbol",
+											"type": "Expression"
+										},
+										"interval": "1d",
+										"startDate": {
+											"value": "@variables('startTimestamp')",
+											"type": "Expression"
+										},
+										"endDate": {
+											"value": "@variables('endTimestamp')",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "ds_raw_stock_data",
+									"type": "DatasetReference",
+									"parameters": {
+										"symbol": "@item().symbol",
+										"dataType": "historical"
+									}
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"name": "Get Stock List",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 3,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "JsonSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "JsonReadSettings"
+						}
+					},
+					"dataset": {
+						"referenceName": "ds_stock_list",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Process Hist Data",
+				"type": "DatabricksNotebook",
+				"dependsOn": [
+					{
+						"activity": "ForEach Stock Symbol",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"notebookPath": "/ETL/Historical Stock Data Processing"
+				},
+				"linkedServiceName": {
+					"referenceName": "ls_databricks_stocketl",
+					"type": "LinkedServiceReference"
+				}
+			}
+		],
+		"parameters": {
+			"symbol": {
+				"type": "array"
+			},
+			"startDate": {
+				"type": "string",
+				"defaultValue": "2024-01-02"
+			},
+			"endDate": {
+				"type": "string",
+				"defaultValue": "2025-02-13"
+			},
+			"interval": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"startTimestamp": {
+				"type": "String",
+				"defaultValue": "@string(div(sub(ticks(concat(pipeline().parameters.startDate, 'T00:00:00Z')), ticks('1970-01-01T00:00:00Z')), 10000000))"
+			},
+			"endTimestamp": {
+				"type": "String",
+				"defaultValue": "@string(div(sub(ticks(concat(pipeline().parameters.endDate, 'T00:00:00Z')), ticks('1970-01-01T00:00:00Z')), 10000000))"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2025-02-14T17:48:04Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

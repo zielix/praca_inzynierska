@@ -1,0 +1,14 @@
+{
+	"name": "ls_yahoo_finance",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"description": "Yahoo Finance API connection for stock data extraction",
+		"annotations": [],
+		"type": "RestService",
+		"typeProperties": {
+			"url": "https://query2.finance.yahoo.com/v8/finance/chart/",
+			"enableServerCertificateValidation": true,
+			"authenticationType": "Anonymous"
+		}
+	}
+}
