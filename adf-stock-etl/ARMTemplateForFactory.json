@@ -1,0 +1,739 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "adf-stock-etl"
+		},
+		"ls_databricks_stocketl_accessToken": {
+			"type": "secureString",
+			"metadata": "Secure string for 'accessToken' of 'ls_databricks_stocketl'"
+		},
+		"ls_adls_stockdata_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://stocketlstore1.dfs.core.windows.net/"
+		},
+		"ls_databricks_stocketl_properties_typeProperties_existingClusterId": {
+			"type": "string",
+			"defaultValue": "0104-170826-2tha9ga9"
+		},
+		"ls_http_yahoo_finance_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://query1.finance.yahoo.com/"
+		},
+		"ls_yahoo_finance_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://query2.finance.yahoo.com/v8/finance/chart/"
+		},
+		"trigger1_properties_pl_master_stock_etl_parameters_symbol": {
+			"type": "array",
+			"defaultValue": [
+				"AAPL",
+				"MSFT",
+				"GOOGL"
+			]
+		},
+		"trigger1_properties_pl_master_stock_etl_parameters_startDate": {
+			"type": "string",
+			"defaultValue": "2025-02-12"
+		},
+		"trigger1_properties_pl_master_stock_etl_parameters_endDate": {
+			"type": "string",
+			"defaultValue": "2025-02-13"
+		},
+		"trigger1_properties_pl_master_stock_etl_parameters_interval": {
+			"type": "string",
+			"defaultValue": "1d"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_load_historical_data')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Master pipeline for orchestrating stock data ETL process",
+				"activities": [
+					{
+						"name": "ForEach Stock Symbol",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Get Stock List",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Get Stock list').output.value[0].stocks",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "Save raw data",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 3,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "RestSource",
+											"httpRequestTimeout": "00:01:40",
+											"requestInterval": "00.00:00:00.010",
+											"requestMethod": "GET",
+											"paginationRules": {
+												"supportRFC5988": "true"
+											}
+										},
+										"sink": {
+											"type": "JsonSink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											},
+											"formatSettings": {
+												"type": "JsonWriteSettings"
+											}
+										},
+										"enableStaging": false
+									},
+									"inputs": [
+										{
+											"referenceName": "ds_yeahoo_finance_hist",
+											"type": "DatasetReference",
+											"parameters": {
+												"symbol": {
+													"value": "@item().symbol",
+													"type": "Expression"
+												},
+												"interval": "1d",
+												"startDate": {
+													"value": "@variables('startTimestamp')",
+													"type": "Expression"
+												},
+												"endDate": {
+													"value": "@variables('endTimestamp')",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "ds_raw_stock_data",
+											"type": "DatasetReference",
+											"parameters": {
+												"symbol": "@item().symbol",
+												"dataType": "historical"
+											}
+										}
+									]
+								}
+							]
+						}
+					},
+					{
+						"name": "Get Stock List",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 3,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "ds_stock_list",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "Process Hist Data",
+						"type": "DatabricksNotebook",
+						"dependsOn": [
+							{
+								"activity": "ForEach Stock Symbol",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"notebookPath": "/ETL/Historical Stock Data Processing"
+						},
+						"linkedServiceName": {
+							"referenceName": "ls_databricks_stocketl",
+							"type": "LinkedServiceReference"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"symbol": {
+						"type": "array"
+					},
+					"startDate": {
+						"type": "string",
+						"defaultValue": "2024-01-02"
+					},
+					"endDate": {
+						"type": "string",
+						"defaultValue": "2025-02-13"
+					},
+					"interval": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"startTimestamp": {
+						"type": "String",
+						"defaultValue": "@string(div(sub(ticks(concat(pipeline().parameters.startDate, 'T00:00:00Z')), ticks('1970-01-01T00:00:00Z')), 10000000))"
+					},
+					"endTimestamp": {
+						"type": "String",
+						"defaultValue": "@string(div(sub(ticks(concat(pipeline().parameters.endDate, 'T00:00:00Z')), ticks('1970-01-01T00:00:00Z')), 10000000))"
+					}
+				},
+				"annotations": [],
+				"lastPublishTime": "2025-02-14T17:48:04Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_stock_list')]",
+				"[concat(variables('factoryId'), '/linkedServices/ls_databricks_stocketl')]",
+				"[concat(variables('factoryId'), '/datasets/ds_yeahoo_finance_hist')]",
+				"[concat(variables('factoryId'), '/datasets/ds_raw_stock_data')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_master_stock_etl')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Master pipeline for orchestrating stock data ETL process",
+				"activities": [
+					{
+						"name": "ForEach Stock Symbol",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Get Stock list",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Get Stock list').output.value[0].stocks",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "Save raw data",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 3,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "RestSource",
+											"httpRequestTimeout": "00:01:40",
+											"requestInterval": "00.00:00:00.010",
+											"requestMethod": "GET",
+											"paginationRules": {
+												"supportRFC5988": "true"
+											}
+										},
+										"sink": {
+											"type": "JsonSink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											},
+											"formatSettings": {
+												"type": "JsonWriteSettings"
+											}
+										},
+										"enableStaging": false
+									},
+									"inputs": [
+										{
+											"referenceName": "ds_yeahoo_finance",
+											"type": "DatasetReference",
+											"parameters": {
+												"symbol": {
+													"value": "@item().symbol",
+													"type": "Expression"
+												},
+												"interval": "1d"
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "ds_raw_stock_data",
+											"type": "DatasetReference",
+											"parameters": {
+												"symbol": "@item().symbol",
+												"dataType": "daily"
+											}
+										}
+									]
+								}
+							]
+						}
+					},
+					{
+						"name": "Get Stock list",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 3,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "ds_stock_list",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "Process Daily Data",
+						"type": "DatabricksNotebook",
+						"dependsOn": [
+							{
+								"activity": "ForEach Stock Symbol",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"notebookPath": "/ETL/Daily Stock Data Processing"
+						},
+						"linkedServiceName": {
+							"referenceName": "ls_databricks_stocketl",
+							"type": "LinkedServiceReference"
+						}
+					},
+					{
+						"name": "Combine Data",
+						"type": "DatabricksNotebook",
+						"dependsOn": [
+							{
+								"activity": "Process Daily Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"notebookPath": "/ETL/Combined Technical Indicators"
+						},
+						"linkedServiceName": {
+							"referenceName": "ls_databricks_stocketl",
+							"type": "LinkedServiceReference"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"symbol": {
+						"type": "array"
+					},
+					"startDate": {
+						"type": "string"
+					},
+					"endDate": {
+						"type": "string"
+					},
+					"interval": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"lastPublishTime": "2025-02-19T17:27:56Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_stock_list')]",
+				"[concat(variables('factoryId'), '/linkedServices/ls_databricks_stocketl')]",
+				"[concat(variables('factoryId'), '/datasets/ds_yeahoo_finance')]",
+				"[concat(variables('factoryId'), '/datasets/ds_raw_stock_data')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_processed_stock_data')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_adls_stockdata",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": "stock_data.parquet",
+						"folderPath": "processed"
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_adls_stockdata')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_raw_stock_data')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Raw stock data in JSON format",
+				"linkedServiceName": {
+					"referenceName": "ls_adls_stockdata",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"symbol": {
+						"type": "string"
+					},
+					"dataType": {
+						"type": "string",
+						"defaultValue": "daily"
+					}
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@concat(dataset().symbol, if(equals(dataset().dataType, 'historical'), '_historical.json', concat('_', formatDateTime(utcnow(), 'yyyy-MM-dd'), '.json')))",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@concat('raw/stock-data/', dataset().dataType, if(equals(dataset().dataType, 'daily'), concat('/', formatDateTime(utcnow(), 'yyyy'), '/', formatDateTime(utcnow(), 'MM')), ''))",
+							"type": "Expression"
+						},
+						"fileSystem": "stock-etl-project"
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_adls_stockdata')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_stock_list')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_adls_stockdata",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": "stockList.json",
+						"folderPath": "lookup",
+						"fileSystem": "stock-etl-project"
+					}
+				},
+				"schema": {
+					"type": "object",
+					"properties": {
+						"stocks": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"symbol": {
+										"type": "string"
+									}
+								}
+							}
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_adls_stockdata')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_yeahoo_finance')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Dataset for fetching data from Yahoo Finance API",
+				"linkedServiceName": {
+					"referenceName": "ls_yahoo_finance",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"symbol": {
+						"type": "string"
+					},
+					"interval": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "RestResource",
+				"typeProperties": {
+					"relativeUrl": {
+						"value": "@concat(\n    dataset().symbol,\n    '?period1=',\n    string(div(sub(ticks(addDays(utcNow(), -1)), ticks('1970-01-01T00:00:00Z')), 10000000)),\n    '&period2=',\n    string(div(sub(ticks(utcNow()), ticks('1970-01-01T00:00:00Z')), 10000000)),\n    '&interval=',\n    dataset().interval\n)",
+						"type": "Expression"
+					}
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_yahoo_finance')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_yeahoo_finance_hist')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Dataset for fetching data from Yahoo Finance API",
+				"linkedServiceName": {
+					"referenceName": "ls_yahoo_finance",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"symbol": {
+						"type": "string"
+					},
+					"interval": {
+						"type": "string"
+					},
+					"startDate": {
+						"type": "string"
+					},
+					"endDate": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "RestResource",
+				"typeProperties": {
+					"relativeUrl": {
+						"value": "@concat(\n    dataset().symbol,\n    '?period1=',\n    dataset().startDate,\n    '&period2=',\n    dataset().endDate,\n    '&interval=',\n    dataset().interval\n)",
+						"type": "Expression"
+					}
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_yahoo_finance')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ls_adls_stockdata')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Connection to Stock ETL Data Lake",
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('ls_adls_stockdata_properties_typeProperties_url')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ls_databricks_stocketl')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Connection to Stock ETL Databricks workspace",
+				"annotations": [],
+				"type": "AzureDatabricks",
+				"typeProperties": {
+					"domain": "https://adb-3475256569278378.18.azuredatabricks.net",
+					"accessToken": {
+						"type": "SecureString",
+						"value": "[parameters('ls_databricks_stocketl_accessToken')]"
+					},
+					"existingClusterId": "[parameters('ls_databricks_stocketl_properties_typeProperties_existingClusterId')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ls_http_yahoo_finance')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Connection to Yahoo Finance API",
+				"annotations": [],
+				"type": "HttpServer",
+				"typeProperties": {
+					"url": "[parameters('ls_http_yahoo_finance_properties_typeProperties_url')]",
+					"enableServerCertificateValidation": true,
+					"authenticationType": "Anonymous"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ls_yahoo_finance')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Yahoo Finance API connection for stock data extraction",
+				"annotations": [],
+				"type": "RestService",
+				"typeProperties": {
+					"url": "[parameters('ls_yahoo_finance_properties_typeProperties_url')]",
+					"enableServerCertificateValidation": true,
+					"authenticationType": "Anonymous"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/trigger1')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "pl_master_stock_etl",
+							"type": "PipelineReference"
+						},
+						"parameters": {
+							"symbol": "[parameters('trigger1_properties_pl_master_stock_etl_parameters_symbol')]",
+							"startDate": "[parameters('trigger1_properties_pl_master_stock_etl_parameters_startDate')]",
+							"endDate": "[parameters('trigger1_properties_pl_master_stock_etl_parameters_endDate')]",
+							"interval": "[parameters('trigger1_properties_pl_master_stock_etl_parameters_interval')]"
+						}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Week",
+						"interval": 1,
+						"startTime": "2025-02-13T20:09:00",
+						"timeZone": "Central European Standard Time",
+						"schedule": {
+							"minutes": [
+								0
+							],
+							"hours": [
+								6
+							],
+							"weekDays": [
+								"Tuesday",
+								"Wednesday",
+								"Thursday",
+								"Friday",
+								"Saturday"
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/pl_master_stock_etl')]"
+			]
+		}
+	]
+}

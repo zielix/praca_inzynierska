@@ -1,0 +1,46 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"value": "adf-stock-etl"
+		},
+		"ls_databricks_stocketl_accessToken": {
+			"value": ""
+		},
+		"ls_adls_stockdata_properties_typeProperties_url": {
+			"value": "https://stocketlstore1.dfs.core.windows.net/"
+		},
+		"ls_databricks_stocketl_properties_typeProperties_existingClusterId": {
+			"value": "0104-170826-2tha9ga9"
+		},
+		"ls_http_yahoo_finance_properties_typeProperties_url": {
+			"value": "https://query1.finance.yahoo.com/"
+		},
+		"ls_yahoo_finance_properties_typeProperties_url": {
+			"value": "https://query2.finance.yahoo.com/v8/finance/chart/"
+		},
+		"trigger1_properties_pl_master_stock_etl_parameters_symbol": {
+			"value": [
+				"AAPL",
+				"MSFT",
+				"GOOGL"
+			]
+		},
+		"trigger1_properties_pl_master_stock_etl_parameters_startDate": {
+			"value": "2025-02-12"
+		},
+		"trigger1_properties_pl_master_stock_etl_parameters_endDate": {
+			"value": "2025-02-13"
+		},
+		"trigger1_properties_pl_master_stock_etl_parameters_interval": {
+			"value": "1d"
+		},
+		"containerUri": {
+			"value": ""
+		},
+		"containerSasToken": {
+			"value": ""
+		}
+	}
+}

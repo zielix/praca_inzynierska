@@ -1,0 +1,109 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "adf-stock-etl"
+		},
+		"ls_databricks_stocketl_accessToken": {
+			"type": "secureString",
+			"metadata": "Secure string for 'accessToken' of 'ls_databricks_stocketl'"
+		},
+		"ls_adls_stockdata_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://stocketlstore1.dfs.core.windows.net/"
+		},
+		"ls_databricks_stocketl_properties_typeProperties_existingClusterId": {
+			"type": "string",
+			"defaultValue": "0104-170826-2tha9ga9"
+		},
+		"ls_http_yahoo_finance_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://query1.finance.yahoo.com/"
+		},
+		"ls_yahoo_finance_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://query2.finance.yahoo.com/v8/finance/chart/"
+		},
+		"trigger1_properties_pl_master_stock_etl_parameters_symbol": {
+			"type": "array",
+			"defaultValue": [
+				"AAPL",
+				"MSFT",
+				"GOOGL"
+			]
+		},
+		"trigger1_properties_pl_master_stock_etl_parameters_startDate": {
+			"type": "string",
+			"defaultValue": "2025-02-12"
+		},
+		"trigger1_properties_pl_master_stock_etl_parameters_endDate": {
+			"type": "string",
+			"defaultValue": "2025-02-13"
+		},
+		"trigger1_properties_pl_master_stock_etl_parameters_interval": {
+			"type": "string",
+			"defaultValue": "1d"
+		},
+		"containerUri": {
+			"type": "string",
+			"metadata": "URI to storage account containing linked ARM templates"
+		},
+		"containerSasToken": {
+			"type": "string",
+			"metadata": "Sas token to storage account containing linked ARM templates"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "adf-stock-etl_ArmTemplate_0",
+			"type": "Microsoft.Resources/deployments",
+			"apiVersion": "2024-03-01",
+			"properties": {
+				"mode": "incremental",
+				"templateLink": {
+					"uri": "[concat(parameters('containerUri'), '/ArmTemplate_0.json', parameters('containerSasToken'))]",
+					"contentVersion": "1.0.0.0"
+				},
+				"parameters": {
+					"factoryName": {
+						"value": "[parameters('factoryName')]"
+					},
+					"ls_databricks_stocketl_accessToken": {
+						"value": "[parameters('ls_databricks_stocketl_accessToken')]"
+					},
+					"ls_adls_stockdata_properties_typeProperties_url": {
+						"value": "[parameters('ls_adls_stockdata_properties_typeProperties_url')]"
+					},
+					"ls_databricks_stocketl_properties_typeProperties_existingClusterId": {
+						"value": "[parameters('ls_databricks_stocketl_properties_typeProperties_existingClusterId')]"
+					},
+					"ls_http_yahoo_finance_properties_typeProperties_url": {
+						"value": "[parameters('ls_http_yahoo_finance_properties_typeProperties_url')]"
+					},
+					"ls_yahoo_finance_properties_typeProperties_url": {
+						"value": "[parameters('ls_yahoo_finance_properties_typeProperties_url')]"
+					},
+					"trigger1_properties_pl_master_stock_etl_parameters_symbol": {
+						"value": "[parameters('trigger1_properties_pl_master_stock_etl_parameters_symbol')]"
+					},
+					"trigger1_properties_pl_master_stock_etl_parameters_startDate": {
+						"value": "[parameters('trigger1_properties_pl_master_stock_etl_parameters_startDate')]"
+					},
+					"trigger1_properties_pl_master_stock_etl_parameters_endDate": {
+						"value": "[parameters('trigger1_properties_pl_master_stock_etl_parameters_endDate')]"
+					},
+					"trigger1_properties_pl_master_stock_etl_parameters_interval": {
+						"value": "[parameters('trigger1_properties_pl_master_stock_etl_parameters_interval')]"
+					}
+				}
+			},
+			"dependsOn": []
+		}
+	]
+}
