@@ -59,3 +59,82 @@ df['FY'] = df.apply(get_fiscal_year, axis=1)
 # df = df.drop('YearMonth_dt', axis=1)
 
 print(df.head())
+
+
+from pyspark.sql import functions as F
+from pyspark.sql import Window
+from datetime import datetime
+
+# Pobierz aktualną datę
+current_date = datetime.now()
+current_year = current_date.year
+current_month = current_date.month
+
+# Konwersja YearMonth na format date
+df = df.withColumn('YearMonth_dt', 
+                   F.to_date(F.col('YearMonth').cast('string'), 'yyyyMM'))
+
+# Aktualna data jako pierwszy dzień miesiąca
+current_yearmonth = f"{current_year}{current_month:02d}01"
+
+# Obliczanie flag czasowych
+# CYTD - Current Year To Date
+df = df.withColumn('CYTD', 
+                   F.when(F.year('YearMonth_dt') == current_year, 1).otherwise(0))
+
+# P1M - Past 1 Month (poprzedni miesiąc)
+df = df.withColumn('P1M',
+                   F.when(F.col('YearMonth_dt') == F.add_months(F.to_date(F.lit(current_yearmonth), 'yyyyMMdd'), -1), 1)
+                   .otherwise(0))
+
+# P3M - Past 3 Months
+df = df.withColumn('P3M',
+                   F.when((F.col('YearMonth_dt') >= F.add_months(F.to_date(F.lit(current_yearmonth), 'yyyyMMdd'), -3)) &
+                          (F.col('YearMonth_dt') < F.to_date(F.lit(current_yearmonth), 'yyyyMMdd')), 1)
+                   .otherwise(0))
+
+# P6M - Past 6 Months
+df = df.withColumn('P6M',
+                   F.when((F.col('YearMonth_dt') >= F.add_months(F.to_date(F.lit(current_yearmonth), 'yyyyMMdd'), -6)) &
+                          (F.col('YearMonth_dt') < F.to_date(F.lit(current_yearmonth), 'yyyyMMdd')), 1)
+                   .otherwise(0))
+
+# P12M - Past 12 Months
+df = df.withColumn('P12M',
+                   F.when((F.col('YearMonth_dt') >= F.add_months(F.to_date(F.lit(current_yearmonth), 'yyyyMMdd'), -12)) &
+                          (F.col('YearMonth_dt') < F.to_date(F.lit(current_yearmonth), 'yyyyMMdd')), 1)
+                   .otherwise(0))
+
+# Obliczanie FY (rok fiskalny zaczyna się w lipcu)
+# Określenie początku roku fiskalnego
+if current_month >= 7:
+    current_fy_start = current_year
+else:
+    current_fy_start = current_year - 1
+
+df = df.withColumn('year', F.year('YearMonth_dt'))
+df = df.withColumn('month', F.month('YearMonth_dt'))
+
+# Obliczenie roku fiskalnego
+df = df.withColumn('fy_start',
+                   F.when(F.col('month') >= 7, F.col('year'))
+                   .otherwise(F.col('year') - 1))
+
+df = df.withColumn('fy_end', F.col('fy_start') + 1)
+
+# Przypisanie wartości FY
+df = df.withColumn('FY',
+                   F.when(F.col('fy_start') == current_fy_start, 'FYTD')
+                   .otherwise(F.concat(F.lit('FY '), 
+                                      F.substring(F.col('fy_start').cast('string'), 3, 2),
+                                      F.lit('/'),
+                                      F.substring(F.col('fy_end').cast('string'), 3, 2))))
+
+# Usuń kolumny pomocnicze
+df = df.drop('year', 'month', 'fy_start', 'fy_end')
+
+# Opcjonalnie usuń YearMonth_dt jeśli nie jest potrzebna
+# df = df.drop('YearMonth_dt')
+
+df.show()
+
